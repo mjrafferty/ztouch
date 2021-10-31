@@ -4,9 +4,8 @@ Inspired by the [zsh-users/zsh-apple-touchbar](https://github.com/zsh-users/zsh-
 
 - Recent History Commands
 - Directory Stack
-- User mappable commands and labels (Coming very soon.)
+- User mappable commands and labels
 - Cycling between modes
-- Custom command support for user defined applications (vim, nano, etc) (Coming soon.)
 
 # Installation
 

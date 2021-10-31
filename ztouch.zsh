@@ -91,7 +91,21 @@ __ztouch_mode_dirstack() {
 }
 
 __ztouch_mode_functions() {
+
+  local key=2
+  local -A funcmap
+
   __ZTOUCH[mode_label]="Func"
+
+  zstyle -a "ztouch:functions" map funcmap
+
+  for label cmd in "${(kv)funcmap[@]}"; do
+    ((key > __ZTOUCH[num_keys])) && break;
+
+    __ztouch_create_key "F${key}" "${label}" "${cmd}" "run"
+
+    ((key++))
+  done
 }
 ## Mode Functions ##
 
@@ -100,6 +114,8 @@ __ztouch_cycle_mode() {
 
   local -a modes
   local modecount index
+
+  __ztouch_clear
 
   modes=( ${(s:,:)__ZTOUCH[modes]} )
   modecount="${#modes[@]}"
@@ -157,18 +173,27 @@ __ztouch_run() {
 
   emulate -L zsh
 
-  __ZTOUCH[message]="${__ZTOUCH[message_start]}PopKeyLabels${__ZTOUCH[message_end]}"
-
-  for ((key=1;key<=__ZTOUCH[num_keys];key++)); do
-    bindkey -s "${__ZTOUCH[F${key}]}" ''
-  done
-
   __ztouch_mode_${__ZTOUCH[current_mode]}
 
   __ztouch_create_key "F1" "${__ZTOUCH[mode_label]}" '__ztouch_cycle_mode'
 
   echo -ne "${__ZTOUCH[message]}"
 
+}
+
+__ztouch_clear() {
+
+  emulate -L zsh
+
+  __ZTOUCH[message]="${__ZTOUCH[message_start]}PopKeyLabels${__ZTOUCH[message_end]}"
+
+  for ((key=1;key<=__ZTOUCH[num_keys];key++)); do
+    bindkey -s "${__ZTOUCH[F${key}]}" ''
+  done
+
+  if [[ -n "$1" ]]; then
+    echo -ne "${__ZTOUCH[message]}"
+  fi
 }
 
 
@@ -199,6 +224,20 @@ __ztouch_init() {
 
 }
 
+ztouch_plugin_unload() {
+
+  add-zsh-hook -d precmd __ztouch_precmd
+  add-zsh-hook -d preexec __ztouch_preexec
+
+  __ztouch_clear
+
+  unfunction ztouch_plugin_unload __ztouch_mode_history __ztouch_mode_dirstack \
+    __ztouch_mode_functions __ztouch_cycle_mode __ztouch_print __ztouch_create_key \
+    __ztouch_run __ztouch_clear __ztouch_init __ztouch_precmd __ztouch_preexec
+
+  unset __ZTOUCH
+}
+
 __ztouch_precmd() {
 
   ((__ZTOUCH[init])) || __ztouch_init
@@ -206,5 +245,11 @@ __ztouch_precmd() {
   __ztouch_run
 }
 
+__ztouch_preexec() {
+
+  __ztouch_clear "now"
+}
+
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd __ztouch_precmd
+add-zsh-hook preexec __ztouch_preexec
