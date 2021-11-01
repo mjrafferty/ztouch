@@ -41,7 +41,7 @@ __ZTOUCH=(
 ## Mode Functions ##
 __ztouch_mode_history() {
 
-  local histsize histitem
+  local histsize histitem key
   local histindex=0
 
   __ZTOUCH[mode_label]="History"
@@ -49,7 +49,7 @@ __ztouch_mode_history() {
   histsize="${#history[@]}"
 
   # Starting at 2 to offset the "mode change" key on F1
-  for ((key=2; key <= ${#__ZTOUCH[num_keys]}; key++)); do
+  for ((key=2; key <= __ZTOUCH[num_keys]; key++)); do
 
     histitem="${history[$((histsize-histindex))]}"
 
@@ -107,6 +107,19 @@ __ztouch_mode_functions() {
     ((key++))
   done
 }
+
+__ztouch_mode_commands() {
+
+  local mode="$1"
+  local key
+  local -a labels
+
+  zstyle -a "ztouch:${mode}" labels labels
+
+  for ((key=1; key <= __ZTOUCH[num_keys]; key++)); do
+    __ztouch_create_key "F${key}" "${labels[key]}" "" "label_only"
+  done
+}
 ## Mode Functions ##
 
 ## Widget Functions ##
@@ -133,14 +146,12 @@ __ztouch_cycle_mode() {
 }
 zle -N __ztouch_cycle_mode
 
-
 __ztouch_print() {
   BUFFER="${__ZTOUCH[$KEYS]}"
   zle end-of-line
 }
 zle -N __ztouch_print
 ## Widget Functions ##
-
 
 __ztouch_create_key() {
 
@@ -160,6 +171,8 @@ __ztouch_create_key() {
     "run")
       bindkey -s "${__ZTOUCH[${key}]}" "${cmd}\n"
       ;;
+    "label_only")
+      ;;
     *)
       bindkey "${__ZTOUCH[${key}]}" "${cmd}"
       ;;
@@ -168,17 +181,21 @@ __ztouch_create_key() {
   __ZTOUCH[${__ZTOUCH[${key}]}]="${cmd}"
 }
 
-
 __ztouch_run() {
 
   emulate -L zsh
+  local matched_mode="$1"
 
-  __ztouch_mode_${__ZTOUCH[current_mode]}
+  __ztouch_clear "now"
 
-  __ztouch_create_key "F1" "${__ZTOUCH[mode_label]}" '__ztouch_cycle_mode'
+  if [[ -n "${matched_mode}" ]]; then
+    __ztouch_mode_commands "${matched_mode}"
+  else
+    __ztouch_mode_${__ZTOUCH[current_mode]}
+    __ztouch_create_key "F1" "${__ZTOUCH[mode_label]}" '__ztouch_cycle_mode'
+  fi
 
   echo -ne "${__ZTOUCH[message]}"
-
 }
 
 __ztouch_clear() {
@@ -195,7 +212,6 @@ __ztouch_clear() {
     echo -ne "${__ZTOUCH[message]}"
   fi
 }
-
 
 # Run once to initialize
 __ztouch_init() {
@@ -233,23 +249,33 @@ ztouch_plugin_unload() {
 
   unfunction ztouch_plugin_unload __ztouch_mode_history __ztouch_mode_dirstack \
     __ztouch_mode_functions __ztouch_cycle_mode __ztouch_print __ztouch_create_key \
-    __ztouch_run __ztouch_clear __ztouch_init __ztouch_precmd __ztouch_preexec
+    __ztouch_run __ztouch_clear __ztouch_init __ztouch_precmd __ztouch_preexec \
+    __ztouch_mode_commands
 
   unset __ZTOUCH
 }
 
 __ztouch_precmd() {
-
-  ((__ZTOUCH[init])) || __ztouch_init
-
   __ztouch_run
 }
 
 __ztouch_preexec() {
 
-  __ztouch_clear "now"
+  local -A patterns
+  local match
+
+  zstyle -a 'ztouch:commands' patterns patterns 
+
+  match="${patterns[(k)$1]}"
+
+  if [[ -n "${match}" ]]; then
+    __ztouch_run "${match}"
+  fi
+
 }
 
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd __ztouch_precmd
 add-zsh-hook preexec __ztouch_preexec
+
+__ztouch_init
